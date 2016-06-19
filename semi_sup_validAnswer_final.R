@@ -254,142 +254,20 @@ for (i in 1:ncol(x)){
 error<-unique(error)
 x<-x[-error,]
 
-# error2<-error[error<=length(label)]
-# label<-label[-error2]
-# orig_dat<-cbind(q_new,q_old,ans_old)
-# orig_dat<-orig_dat[-error,]
+
 
 
 
 # supervised/ semi-supervised models
 
-p<-0   
-Nrep<-1
-perf_record<-matrix(0,Nrep,6)
-perf_q<-matrix(0,Nrep,5)
-for (n in 1:Nrep){
-  ypred<-label
-  weak<-vector(); medium<-vector(); strong<-vector(); all<-vector() # measure performance (question-based)
+Qperformance <- function(IndQ,data_q,phat,ytrue,k){
+  # question performance
+  weak<-vector(); all<-vector()
   sum_rank<-0; sum_q<-0 # measure performance (question-based)
-  IndQ<-CVInd(n=length(data_q),10)
-  KK<-length(IndQ)
-  for (kk in 1:KK){
-    # question index for test set
-    listQtest<-IndQ[[kk]]
-    
-    # collect record index for test set
-    test_range<-vector(); train_range<-1:length(label)
-    for (q in listQtest){
-      test_range<-c(test_range,data_q[[q]])
-    }
-    
-    train_range<-train_range[-test_range]
-    data<-cbind(x[1:length(label),],label)
-    label_feature<- data[train_range,-ncol(data)]; label_class<-label[train_range]; ytrue= label[test_range]
-    temp_index<-length(label)+1
-    unlabel_feature<-x[temp_index:nrow(x),]
-    
-    col<-colnames(data)
-    train<-cbind(label_feature,as.factor(label_class))
-    colnames(train)<-col
-    
-    train<-as.data.frame(label_feature)
-    train<-data.frame(train,"label"=as.factor(label_class))
-   
-    # re-sampling data addressing unbalanced issue
-#     newdata<-as.data.frame(train) 
-    newdata<-SMOTE(label~.,as.data.frame(train),perc.over=100,perc.under=200)
-    colnames(newdata)<-col
-    
-    
-    # naive bayes
-#       m<-naiveBayes(label~.,data=as.data.frame(newdata),laplace=5)
-#       prob<-predict(m,as.data.frame(unlabel_feature),type ="raw")
-#       phat<-prob[,2]
-    
-    #SVM
-#     m<-svm(label~.,newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
-#     preds<-predict(m,as.data.frame(unlabel_feature),probability=TRUE)
-#     prob<-attr(preds,"probabilities")
-#     phat<-prob[,2]
-    
-    # nnet
-    m<-nnet(label~.,newdata,linout=F,skip=F,size=5,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
-    test_dat<-as.data.frame(unlabel_feature); row<-1:nrow(test_dat); rownames(test_dat)<-row
-    prob<-predict(m,as.data.frame(test_dat),type ="raw")
-    phat<-prob[,1]
-    
-    # assign label with specified cut-off probability value
-    lab<-as.numeric(phat>=0.75)    
-    unlabel<-cbind(unlabel_feature,lab)
-    colnames(unlabel)<-col
-    
-        # repeat EM algorithm
-        for (i in 1:10){
-          Ind<-CVInd(n=nrow(unlabel),10)
-          K<-length(Ind)
-          for (k in 1:K){
-            new_train<-rbind(unlabel[Ind[[k]],],train)
-            lab<-new_train$label
-            new_train<-new_train[,-ncol(new_train)]
-            new_train<-data.frame(new_train,"label"=as.factor(lab))
-#             newdata<-as.data.frame(new_train)
-            newdata<-SMOTE(label~.,as.data.frame(new_train),perc.over=100,perc.under=200)
-            
-#                     # naive bayes
-#                     m<-naiveBayes(label~.,data=as.data.frame(newdata))
-#                     prob<-predict(m,as.data.frame(unlabel[-Ind[[k]],-ncol(unlabel)]),type ="raw")
-#                     phat<-prob[,2]
-            
-                     #SVM
-#                     m<-svm(label~.,newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
-#                     preds<-predict(m,as.data.frame(unlabel[-Ind[[k]],-ncol(unlabel)]),probability=TRUE)
-#                     prob<-attr(preds,"probabilities")
-#                     phat<-prob[,2]
-            
-            m<-nnet(label~.,newdata,linout=F,skip=F,size=5,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
-            test_dat<-as.data.frame(unlabel[-Ind[[k]],-ncol(unlabel)]); row<-1:nrow(test_dat); rownames(test_dat)<-row
-            prob<-predict(m,as.data.frame(test_dat),type ="raw")
-            phat<-prob[,1]
-            
-            unlabel[-Ind[[k]],ncol(unlabel)]<-as.numeric(phat>=0.75)
-          }
-        }
-   
-        # conbine unlabel with label
-        final_train<-rbind(unlabel,train)
-        lab<-final_train$label
-        final_train<-as.data.frame(final_train); 
-        final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))
-        
-        newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
-#         newdata<-as.data.frame(final_train)
-        colnames(newdata)<-col
-    
-#     #naive bayes
-#         m<-naiveBayes(label~.,data=as.data.frame(final_train))
-#         prob<-predict(m,as.data.frame(x[test_range,]),type="raw")
-#         phat<-prob[,2]
-    
-    #SVM
-#         m<-svm(label~.,data=newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
-#         preds<-predict(m,as.data.frame(x[test_range,]),probability=TRUE)
-#         prob<-attr(preds,"probabilities")
-#         phat<-prob[,2]
-    
-    # nnet
-        m<-nnet(label~.,newdata,linout=F,skip=F,size=5,decay=0.01,maxit=1000,trace=F)
-        test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
-        prob<-predict(m,as.data.frame(test_dat),type ="raw") 
-        phat<-prob[,1]
-    
-    class<-as.numeric(phat>=0.75)
-    
-    
-
-    # question performance
-    sum<-0
-    for (q in listQtest){
+  sum<-0
+  class<-as.numeric(phat>=0.75)
+  for (kk in k){
+    for (q in IndQ[[kk]]){
       record_index<-data_q[[q]]
       len_index<-length(data_q[[q]])
       temp1<-sum+1; temp2<-sum+len_index
@@ -417,68 +295,527 @@ for (n in 1:Nrep){
       }
       
       if (count_0 < ceiling(p*count0_label)){
-        weak<-c(weak,0); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+        weak<-c(weak,0); all<-c(all,0)
       }else{
         if (count1_label==0 & count==0){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,1); all<-c(all,1)
+          weak<-c(weak,1); all<-c(all,1)
         }else if(count1_label==0 & count!=0){
-          weak<-c(weak,0); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,0); all<-c(all,0)
         }else if(count1_label==1 & count>=1){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,1); all<-c(all,1)
+          weak<-c(weak,1); all<-c(all,1)
         }else if(count1_label==1 & count<1){
-          weak<-c(weak,0); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,0); all<-c(all,0)
         }else if(count1_label==2 & count>=2){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,1); all<-c(all,1)
+          weak<-c(weak,1); all<-c(all,1)
         }else if(count1_label==2 & count==1){
-          weak<-c(weak,1); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,1); all<-c(all,0)
         }else if(count1_label==2 & count<1){
-          weak<-c(weak,0); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,0); all<-c(all,0)
         }else if(count1_label==3 & count>=3){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,1); all<-c(all,1)
+          weak<-c(weak,1); all<-c(all,1)
         }else if(count1_label==3 & count==2){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,1); all<-c(all,0)
         }else if(count1_label==3 & count==1){
-          weak<-c(weak,1); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,1); all<-c(all,0)
         }else if(count1_label==3 & count<1){
-          weak<-c(weak,0); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,0); all<-c(all,0)
         }else if(count1_label>3 & count==count1_label){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,1); all<-c(all,1)
+          weak<-c(weak,1); all<-c(all,1)
         }else if(count1_label>3 & count==3){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,1); all<-c(all,0)
+          weak<-c(weak,1); all<-c(all,0)
         }else if(count1_label>3 & count==2){
-          weak<-c(weak,1); medium<-c(medium,1); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,1); all<-c(all,0)
         }else if(count1_label>3 & count==1){
-          weak<-c(weak,1); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,1); all<-c(all,0)
         }else if(count1_label>3 & count<1){
-          weak<-c(weak,0); medium<-c(medium,0); strong<-c(strong,0); all<-c(all,0)
+          weak<-c(weak,0); all<-c(all,0)
         }
-      
+        
       }
       
       sum<-sum+len_index
+      
+      
     }
-    ypred[test_range]<-class
   }
-  # record performance
-  pre<-prediction(ypred,as.numeric(label))
-  perf<-performance(pre,"auc")
-  auc<-attributes(perf)$y.values[[1]]
-  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
-  f1<-2*TP/ (2*TP+FN+FP)
-  perf_record[n,]<-c(auc,TP,TN,FP,FN,f1)
-  
-  # question performance
-  weak_rate<-sum(weak==1)/length(weak); medium_rate<-sum(medium==1)/length(medium); strong_rate<-sum(strong==1)/length(strong); all_rate<-sum(all==1)/length(all)
-  rank_rate<-sum_rank/sum_q
-  perf_q[n,]<-c(weak_rate,medium_rate,strong_rate,all_rate,rank_rate)
+  weak_rate<- sum(weak==1)/length(weak); all_rate <- sum(all==1)/length(all)
+  MRR <- sum_rank/sum_q
+  return (c(weak_rate,all_rate,MRR))
 }
 
+# sink("output.txt")
+# set.seed(1)
+Nrep<-100
+perf_record_svm<-matrix(0,Nrep,7)
+perf_q_svm<-matrix(0,Nrep,3)
 
-a<-apply(perf_record,2,mean)
-prec<-a[2]/(a[2]+a[4]); rec<-a[2]/(a[2]+a[5])
-print (a)
-print (prec)
-print (rec)
-apply(perf_q,2,mean)
+perf_record_nnet<-matrix(0,Nrep,7)
+perf_q_nnet<-matrix(0,Nrep,3)
 
+perf_record_nnetL2<-matrix(0,Nrep,7)
+perf_q_nnetL2<-matrix(0,Nrep,3)
+
+perf_record_log<-matrix(0,Nrep,7)
+perf_q_log<-matrix(0,Nrep,3)
+
+perf_record_svm_semi1<-matrix(0,Nrep,7)
+perf_q_svm_semi1<-matrix(0,Nrep,3)
+
+perf_record_nnet_semi1<-matrix(0,Nrep,7)
+perf_q_nnet_semi1<-matrix(0,Nrep,3)
+
+perf_record_nnetL2_semi1<-matrix(0,Nrep,7)
+perf_q_nnetL2_semi1<-matrix(0,Nrep,3)
+
+perf_record_log_semi1<-matrix(0,Nrep,7)
+perf_q_log_semi1<-matrix(0,Nrep,3)
+
+perf_record_svm_semi10<-matrix(0,Nrep,7)
+perf_q_svm_semi10<-matrix(0,Nrep,3)
+
+perf_record_nnet_semi10<-matrix(0,Nrep,7)
+perf_q_nnet_semi10<-matrix(0,Nrep,3)
+
+perf_record_nnetL2_semi10<-matrix(0,Nrep,7)
+perf_q_nnetL2_semi10<-matrix(0,Nrep,3)
+
+perf_record_log_semi10<-matrix(0,Nrep,7)
+perf_q_log_semi10<-matrix(0,Nrep,3)
+
+
+
+p<-0
+for (n in 1:Nrep){
+  # print (paste("n:",n))
+  gc()
+  IndQ<-CVInd(n=length(data_q),10)
+  ppred_svm<-label; ppred_nnet<-label; ppred_nnetL2<-label; ppred_log<-label;
+  ppred_svm_semi1<-label; ppred_nnet_semi1<-label; ppred_nnetL2_semi1<-label; ppred_log_semi1<-label;
+  ppred_svm_semi10<-label; ppred_nnet_semi10<-label; ppred_nnetL2_semi10<-label; ppred_log_semi10<-label;
+  
+  KK<-length(IndQ)
+  
+  for (kk in 1:KK){
+    # print (paste("cv:",kk))
+    
+    # question index for test set
+    listQtest<-IndQ[[kk]]
+    
+    # collect record index for test set
+    test_range<-vector(); train_range<-1:length(label)
+    for (q in listQtest){
+      test_range<-c(test_range,data_q[[q]])
+    }
+    
+    train_range<-train_range[-test_range]
+    data<-cbind(x[1:length(label),],label)
+    label_feature<- data[train_range,-ncol(data)]; label_class<-label[train_range]; ytrue= label[test_range]
+    temp_index<-length(label)+1
+    unlabel_feature<-x[temp_index:nrow(x),]
+    
+    col<-colnames(data)
+    train<-cbind(label_feature,as.factor(label_class))
+    colnames(train)<-col
+    
+    train<-as.data.frame(label_feature)
+    train<-data.frame(train,"label"=as.factor(label_class))
+    
+    # re-sampling data addressing unbalanced issue
+    
+    newdata<-SMOTE(label~.,as.data.frame(train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    newdata_back<-newdata
+    colnames(newdata_back)<-col
+    
+    #SVM
+    m<-svm(label~.,newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
+    preds<-predict(m,as.data.frame(x[test_range,]),probability=TRUE)
+    prob<-attr(preds,"probabilities")
+    ppred_svm[test_range]<-prob[,2]
+    
+    
+    # log
+    m<-glm(label~.,family=binomial(link='logit'),data=newdata)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    ppred_log[test_range]<-predict(m,as.data.frame(test_dat),type='response')
+    
+    
+    # nnet_L2
+    m<-nnet(label~.,newdata,linout=F, skip=F,size=5,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw")
+    ppred_nnetL2[test_range]<-prob[,1]
+    
+    
+    # nnet
+    newdata_back$Y<-class.ind(newdata_back$label)
+    newdata_back$label<-NULL
+    m<-nnet(Y~.,newdata_back,linout=F,entropy=T, softmax=T,skip=F,size=2,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw")
+    ppred_nnet[test_range]<-prob[,1]
+    
+    
+    #######################################
+    
+    # EM
+    m<-svm(label~.,newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
+    preds<-predict(m,as.data.frame(unlabel_feature),probability=TRUE)
+    prob<-attr(preds,"probabilities")
+    phat<-prob[,2]
+    
+    unlabel_svm<-cbind(unlabel_feature,as.numeric(phat>=0.75))
+    colnames(unlabel_svm)<-col
+    
+    m<-glm(label~.,family=binomial(link='logit'),data=newdata)
+    test_dat<-as.data.frame(unlabel_feature); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    phat<-predict(m,as.data.frame(test_dat),type='response')
+    
+    unlabel_log<-cbind(unlabel_feature,as.numeric(phat>=0.75))
+    colnames(unlabel_log)<-col
+    
+    
+    m<-nnet(label~.,newdata,linout=F, skip=F,size=5,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
+    test_dat<-as.data.frame(unlabel_feature); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw")
+    phat<-prob[,1]
+    
+    unlabel_nnetL2<-cbind(unlabel_feature,as.numeric(phat>=0.75))
+    colnames(unlabel_nnetL2)<-col
+    
+    
+    newdata$Y<-class.ind(newdata$label)
+    newdata$label<-NULL
+    m<-nnet(Y~.,newdata,linout=F,entropy=T,softmax=T,skip=F,size=2,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
+    test_dat<-as.data.frame(unlabel_feature); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw")
+    phat<-prob[,1]
+    
+    unlabel_nnet<-cbind(unlabel_feature,as.numeric(phat>=0.75))
+    colnames(unlabel_nnet)<-col
+    
+    Ind <- CVInd(n=nrow(unlabel_svm),10)
+    # EM iterations
+    for (i in 1:10){
+      K<-length(Ind)
+      for (k in 1:K){
+        
+        # svm
+        new_train<-rbind(unlabel_svm[Ind[[k]],],train)
+        lab<-new_train$label
+        new_train<-new_train[,-ncol(new_train)]
+        new_train<-data.frame(new_train,"label"=as.factor(lab))
+        newdata<-SMOTE(label~.,as.data.frame(new_train),perc.over=100,perc.under=200)
+        m<-svm(label~.,newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
+        preds<-predict(m,as.data.frame(unlabel_svm[-Ind[[k]],-ncol(unlabel_svm)]),probability=TRUE)
+        prob<-attr(preds,"probabilities")
+        phat<-prob[,2]
+        unlabel_svm[-Ind[[k]],ncol(unlabel_svm)]<-as.numeric(phat>=0.75)
+        
+        
+        # log
+        new_train<-rbind(unlabel_log[Ind[[k]],],train)
+        lab<-new_train$label
+        new_train<-new_train[,-ncol(new_train)]
+        new_train<-data.frame(new_train,"label"=as.factor(lab))
+        newdata<-SMOTE(label~.,as.data.frame(new_train),perc.over=100,perc.under=200)
+        m<-glm(label~.,family=binomial(link='logit'),data=newdata)
+        test_dat<-as.data.frame(unlabel_log[-Ind[[k]],-ncol(unlabel_log)]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+        phat<-predict(m,as.data.frame(test_dat),type='response')
+        unlabel_log[-Ind[[k]],ncol(unlabel_log)]<-as.numeric(phat>=0.75)
+        
+        
+        # nnet_L2
+        new_train<-rbind(unlabel_nnetL2[Ind[[k]],],train)
+        lab<-new_train$label
+        new_train<-new_train[,-ncol(new_train)]
+        new_train<-data.frame(new_train,"label"=as.factor(lab))
+        newdata<-SMOTE(label~.,as.data.frame(new_train),perc.over=100,perc.under=200)
+        m<-nnet(label~.,newdata,linout=F,skip=F,size=5,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
+        test_dat<-as.data.frame(unlabel_nnetL2[-Ind[[k]],-ncol(unlabel_nnetL2)]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+        prob<-predict(m,as.data.frame(test_dat),type ="raw")
+        phat<-prob[,1]
+        unlabel_nnetL2[-Ind[[k]],ncol(unlabel_nnetL2)]<-as.numeric(phat>=0.75)
+        
+        
+        # nnet
+        new_train<-rbind(unlabel_nnet[Ind[[k]],],train)
+        lab<-new_train$label
+        new_train<-new_train[,-ncol(new_train)]
+        new_train<-data.frame(new_train,"label"=as.factor(lab))
+        newdata<-SMOTE(label~.,as.data.frame(new_train),perc.over=100,perc.under=200)
+        newdata$Y<-class.ind(newdata$label)
+        newdata$label<-NULL
+        m<-nnet(Y~.,newdata,linout=F,entropy=T, softmax=T,skip=F,size=2,decay=0.01,maxit=1000,trace=F,na.rm=TRUE)
+        test_dat<-as.data.frame(unlabel_nnet[-Ind[[k]],-ncol(unlabel_nnet)]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+        prob<-predict(m,as.data.frame(test_dat),type ="raw")
+        phat<-prob[,1]
+        unlabel_nnet[-Ind[[k]],ncol(unlabel_nnet)]<-as.numeric(phat>=0.75)
+        
+      }
+      # EM 1 iteration
+      if (i==1){
+        unlabel_svm1<-unlabel_svm
+        unlabel_nnet1<-unlabel_nnet
+        unlabel_nnetL21<- unlabel_nnetL2
+        unlabel_log1<-unlabel_log
+      }
+    }
+    
+    
+    
+    # svm
+    final_train<-rbind(unlabel_svm1,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    m<-svm(label~.,data=newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
+    preds<-predict(m,as.data.frame(x[test_range,]),probability=TRUE)
+    prob<-attr(preds,"probabilities")
+    ppred_svm_semi1[test_range]<-prob[,2]
+    
+    
+    # log
+    final_train<-rbind(unlabel_log1,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    m<-glm(label~.,family=binomial(link='logit'),data=newdata)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    ppred_log_semi1[test_range]<-predict(m,as.data.frame(test_dat),type='response')
+    
+    
+    # nnet_L2
+    final_train<-rbind(unlabel_nnetL21,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    m<-nnet(label~.,newdata,linout=F,skip=F,size=5,decay=0.01,maxit=1000,trace=F)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw") 
+    ppred_nnetL2_semi1[test_range]<-prob[,1]
+    
+    
+    # nnet
+    final_train<-rbind(unlabel_nnet1,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    newdata$Y<-class.ind(newdata$label)
+    newdata$label<-NULL
+    m<-nnet(Y~.,newdata,linout=F,entropy=T, softmax=T,skip=F,size=2,decay=0.01,maxit=1000,trace=F)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw") 
+    ppred_nnet_semi1[test_range]<-prob[,1]
+    
+    
+    #---------------------------------------------------------#
+    
+    # svm
+    final_train<-rbind(unlabel_svm,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    m<-svm(label~.,data=newdata,kernel="radial",gamma=0.001,cost=10,probability=TRUE)
+    preds<-predict(m,as.data.frame(x[test_range,]),probability=TRUE)
+    prob<-attr(preds,"probabilities")
+    ppred_svm_semi10[test_range]<-prob[,2]
+    
+    
+    # log
+    final_train<-rbind(unlabel_log,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    m<-glm(label~.,family=binomial(link='logit'),data=newdata)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    ppred_log_semi10[test_range]<-predict(m,as.data.frame(test_dat),type='response')
+    
+    # nnet_L2
+    final_train<-rbind(unlabel_nnetL2,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    m<-nnet(label~.,newdata,linout=F,skip=F,size=5,decay=0.01,maxit=1000,trace=F)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw") 
+    ppred_nnetL2_semi10[test_range]<-prob[,1]
+    
+    
+    # nnet
+    final_train<-rbind(unlabel_nnet,train)
+    lab<-final_train$label
+    final_train<-as.data.frame(final_train); 
+    final_train<-data.frame(final_train[,-ncol(final_train)],label=as.factor(lab))  
+    newdata<-SMOTE(label~.,as.data.frame(final_train),perc.over=100,perc.under=200)
+    colnames(newdata)<-col
+    newdata$Y<-class.ind(newdata$label)
+    newdata$label<-NULL
+    m<-nnet(Y~.,newdata,linout=F,entropy=T,softmax=T,skip=F,size=2,decay=0.01,maxit=1000,trace=F)
+    test_dat<-as.data.frame(x[test_range,]); row<-1:nrow(test_dat); rownames(test_dat)<-row
+    prob<-predict(m,as.data.frame(test_dat),type ="raw") 
+    ppred_nnet_semi10[test_range]<-prob[,1]
+    
+    
+  }
+  
+  # store performance metrices
+  
+  #---------------------------------------------------------#
+  # supervised
+  
+  ppred<-ppred_svm
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_svm[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_svm[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_log
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_log[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_log[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_nnet
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_nnet[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_nnet[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_nnetL2
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_nnetL2[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_nnetL2[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  #---------------------------------------------------------#
+  # semi-supervised learning 1 iteration
+  
+  ppred<-ppred_svm_semi1
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_svm_semi1[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_svm_semi1[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  
+  ppred<-ppred_log_semi1
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_log_semi1[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_log_semi1[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_nnet_semi1
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_nnet_semi1[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_nnet_semi1[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_nnetL2_semi1
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_nnetL2_semi1[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_nnetL2_semi1[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  #---------------------------------------------------------#
+  # semi-supervised learning 10 iterations
+  
+  ppred<-ppred_svm_semi10
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_svm_semi10[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_svm_semi10[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_log_semi10
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_log_semi10[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_log_semi10[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_nnet_semi10
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_nnet_semi10[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_nnet_semi10[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+  ppred<-ppred_nnetL2_semi10
+  ypred<-as.numeric(ppred>=0.75)
+  TP<-sum(label==1 & ypred==1); TN<-sum(label==0 & ypred==0); FP<-sum(label==0 & ypred==1); FN<-sum(label==1 & ypred==0)
+  F1<-2*TP/ (2*TP+FN+FP)
+  prec<-TP/(TP+FP); rec<-TP/(TP+FN)
+  perf_record_nnetL2_semi10[n,]<-c(TP,TN,FP,FN,prec,rec,F1)
+  
+  qperf <-Qperformance(IndQ,data_q,ppred,label,1:10)
+  perf_q_nnetL2_semi10[n,]<-c(qperf[1],qperf[2],qperf[3])
+  
+  
+}
 
